@@ -1,4 +1,4 @@
-package constant;
+package cn.bos.monitor.constant;
 
 public class Constant {
     public static final String LOG_TS_FORMAT = "yyyyMMddHHmmss";
