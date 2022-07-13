@@ -11,16 +11,21 @@ import org.slf4j.LoggerFactory;
 
 
 import java.sql.SQLException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class Parser {
     ConnectionPool pool;
     EntityFetcher fetcher;
+    ThreadPoolExecutor executor;
     Logger logger = LoggerFactory.getLogger(Parser.class);
-
 
     public Parser() {
         this.pool = new ConnectionPool();
         this.fetcher = new EntityFetcher();
+        this.executor = new ThreadPoolExecutor(20, 100, 10, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<Runnable>(100), new ThreadPoolExecutor.CallerRunsPolicy());
         establishDBConnections();
     }
 
@@ -44,12 +49,15 @@ public class Parser {
     public void parseRule() {
         try {
             JSONArray rules = this.fetcher.getRule();
-            CronLauncher cronLauncher = new CronLauncher();
-            SpanLauncher spanLauncher = new SpanLauncher();
             for (int i=0; i<rules.length(); i++) {
                 JSONObject o = (JSONObject) rules.get(i);
-                if ("span".equals(o.getString("type").toLowerCase())) {
-                    spanLauncher.logging(this.pool, o);
+                switch (o.getString("type")) {
+                    case "span":
+                        executor.execute(new SpanLauncher(this.pool, o));
+                        break;
+                    case "cron":
+                        executor.execute(new CronLauncher(this.pool, o));
+                        break;
                 }
             }
         } catch (SQLException e) {

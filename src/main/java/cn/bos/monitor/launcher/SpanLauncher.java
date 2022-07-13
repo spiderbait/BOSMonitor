@@ -16,8 +16,16 @@ import java.io.OutputStreamWriter;
 import java.sql.Statement;
 import java.util.Calendar;
 
-public class SpanLauncher {
+public class SpanLauncher implements Runnable{
     Logger logger = LoggerFactory.getLogger(CronLauncher.class);
+
+    ConnectionPool pool;
+    JSONObject o;
+
+    public SpanLauncher(ConnectionPool pool, JSONObject o) {
+        this.pool = pool;
+        this.o = o;
+    }
 
     public void logging(ConnectionPool pool, JSONObject o) {
 
@@ -34,7 +42,9 @@ public class SpanLauncher {
                 Statement stmt = pool.getByKey(o.getString("mid")).createStatement();
                 BufferedWriter writer = new BufferedWriter(
                         new OutputStreamWriter(
-                                new FileOutputStream(path, true)));
+                                new FileOutputStream(
+                                        path.replace("yyyymmdd",
+                                        TimestampFormatter.getNowTimestampString(Constant.PATH_FILENAME_FORMAT)), true)));
                 JSONArray result;
                 writer.write(TimestampFormatter.getNowTimestampString(Constant.LOG_TS_FORMAT)+ " START\n");
                 writer.flush();
@@ -59,10 +69,12 @@ public class SpanLauncher {
                         }
                         writer.write(TimestampFormatter.getNowTimestampString(Constant.LOG_TS_FORMAT)+ " ERROR\n");
                         writer.write(sb.toString());
+                        writer.write("\n");
                         MailSender.send(o.getString("receivers").split(","),
                                 o.getString("name"),
                                 sb.toString());
                         writer.flush();
+                        break;
 
                     }
                     Thread.sleep(60000);
@@ -71,11 +83,17 @@ public class SpanLauncher {
                         + " " + o.getString("end_keyword") + "\n");
                 writer.flush();
                 logger.info("Span task ended for " + o);
-            } else {
-                logger.info("Span task not reach time: " + o);
             }
+//            else {
+//                logger.info("Span task not reach time: " + o);
+//            }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void run() {
+        logging(this.pool, this.o);
     }
 }
